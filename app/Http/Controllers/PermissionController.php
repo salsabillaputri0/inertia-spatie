@@ -9,88 +9,105 @@ use Spatie\Permission\Models\Permission;
 
 class PermissionController extends Controller implements HasMiddleware
 {
+    /**
+     * Menentukan middleware untuk controller ini.
+     * Setiap middleware bertanggung jawab untuk memastikan pengguna memiliki izin yang sesuai
+     * untuk tindakan tertentu di controller ini.
+     */
     public static function middleware()
     {
         return [
+            // Middleware untuk metode 'index' (tampilan daftar permission)
             new Middleware('permission:permissions index', only: ['index']),
+            // Middleware untuk metode 'create' dan 'store' (tindakan create dan store permission)
             new Middleware('permission:permissions create', only: ['create', 'store']),
+            // Middleware untuk metode 'edit' dan 'update' (tindakan edit dan update permission)
             new Middleware('permission:permissions edit', only: ['edit', 'update']),
+            // Middleware untuk metode 'destroy' (tindakan delete permission)
             new Middleware('permission:permissions delete', only: ['destroy']),
         ];
     }
 
     /**
-     * Display a listing of the resource.
+     * Menampilkan daftar resource (permission).
+     * Metode ini menangani penyaringan dan paginasi dari permissions.
      */
     public function index(Request $request)
     {
-        //  get permissions
+        // Mengambil data permissions dari database, dengan penyaringan jika disediakan
         $permissions = Permission::select('id', 'name')
-            ->when($request->search,fn($search) => $search->where('name', 'like', '%'.$request->search.'%'))
+            // Menerapkan filter pencarian berdasarkan kolom 'name', jika query pencarian ada
+            ->when($request->search, fn($search) => $search->where('name', 'like', '%'.$request->search.'%'))
+            // Mengurutkan permissions berdasarkan yang terbaru
             ->latest()
+            // Menerapkan paginasi hasil dan mempertahankan query string filter pada URL
             ->paginate(6)->withQueryString();
 
-        // render view
-        return inertia('Permissions/Index', ['permissions' => $permissions,'filters' => $request->only(['search'])]);
+        // Mengembalikan tampilan dengan daftar permissions dan filter yang aktif
+        return inertia('Permissions/Index', ['permissions' => $permissions, 'filters' => $request->only(['search'])]);
     }
 
     /**
-     * Show the form for creating a new resource.
+     * Menampilkan form untuk membuat resource (permission) baru.
      */
     public function create()
     {
-        // render view
+        // Mengembalikan tampilan untuk membuat permission baru
         return inertia('Permissions/Create');
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Menyimpan resource (permission) yang baru dibuat ke dalam database.
+     * Memvalidasi data yang masuk untuk memastikan 'name' unik.
      */
     public function store(Request $request)
     {
-        // validate request
+        // Memvalidasi bahwa kolom 'name' wajib ada, unik, dan memiliki panjang antara 3 hingga 255 karakter
         $request->validate(['name' => 'required|min:3|max:255|unique:permissions']);
 
-        // create new permission data
+        // Membuat record permission baru di database
         Permission::create(['name' => $request->name]);
 
-        // render view
+        // Mengarahkan kembali pengguna ke halaman index permissions setelah permission baru dibuat
         return to_route('permissions.index');
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Menampilkan form untuk mengedit resource (permission) yang ada.
      */
     public function edit(Permission $permission)
     {
-        // render view
+        // Mengembalikan tampilan untuk mengedit permission yang ditentukan
         return inertia('Permissions/Edit', ['permission' => $permission]);
     }
 
     /**
-     * Update the specified resource in storage.
+     * Memperbarui resource (permission) yang ditentukan di database.
+     * Kolom 'name' divalidasi untuk memastikan keunikannya, kecuali untuk permission yang sedang diedit.
      */
     public function update(Request $request, Permission $permission)
     {
-        // validate request
+        // Memvalidasi bahwa kolom 'name' wajib ada, unik, dan memiliki panjang antara 3 hingga 255 karakter
+        // Mengecualikan ID permission yang sedang diedit agar dapat memperbarui nama tanpa konflik
         $request->validate(['name' => 'required|min:3|max:255|unique:permissions,name,'.$permission->id]);
 
-        // update permission data
+        // Memperbarui nama permission di database
         $permission->update(['name' => $request->name]);
 
-        // render view
+        // Mengarahkan kembali pengguna ke halaman index permissions setelah update berhasil
         return to_route('permissions.index');
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Menghapus resource (permission) yang ditentukan dari database.
+     * Menghapus record permission secara permanen.
      */
     public function destroy(Permission $permission)
     {
-        // delete permissions data
+        // Menghapus permission yang ditentukan dari database
         $permission->delete();
 
-        // render view
+        // Kembali ke halaman sebelumnya (biasanya halaman index permissions)
         return back();
     }
 }
